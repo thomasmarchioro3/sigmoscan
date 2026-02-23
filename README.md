@@ -1,6 +1,6 @@
 # SigmoScan
 
-This tool can be used to monitor an interface, collect network packets, generate a PCAP file every `ROTATE_EVERY_T_SEC` seconds, and forward the PCAP to an Apache Kafka broker.
+This tool can be used to monitor an interface, collect network packets, and extract flow data every `ROTATE_EVERY_T_SEC` using NFStream and forward the flow data to an Apache Kafka broker.
 
 ## Requirements
 
@@ -8,7 +8,7 @@ This tool can be used to monitor an interface, collect network packets, generate
 
 ## Configuration
 
-The network scanner can be configured using the `config.ini` file.
+SigmoScan can be configured using the `config.ini` file.
 Important parameters are:
 
 - `[SCANNER]`
@@ -17,13 +17,13 @@ Important parameters are:
 
 - `[KAFKA]`
     - `ADDRESS_SERVER` The address of the Kafka server (e.g., `http://127.0.0.1:9092`)
-    - `TOPIC` The Kafka topic where the network metadata should be sent.
+    - `TOPIC` The Kafka topic where the network flow data should be sent.
 
 ## Deployment
 
-The network scanner can be deployed by building the `Dockerfile` in the root directory.
+SigmoScan can be deployed by building the `Dockerfile` in the root directory.
 
-```
+```sh
 docker build . -t sigmoscan:latest && docker run -it --rm --network=host --cap-add=NET_ADMIN --cap-add=NET_RAW --cpus=1.0 sigmoscan:latest
 ```
 
@@ -33,7 +33,7 @@ DISCLAIMER: Since SigmoScan heavily relies on Python multiprocessing, its defaul
 
 ### Testing
 
-The network scanner can be tested by running
+SigmoScan can be tested by running
 
 ```
 make test
