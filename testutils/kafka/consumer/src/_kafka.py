@@ -116,10 +116,16 @@ class EngineKafkaConsumer(Process):
 
             for message in consumer:
                 try:
-                    data_str = message.value["Attachment"]["Content"]
+                    message_ts: str = message.value["CreateTime"]
+                    data_str: str = message.value["Attachment"]["Content"]
                     df = pd.read_csv(io.StringIO(data_str))
 
-                    self.queue_ingested.put(df)
+                    # TODO Define ingested messages as TypedDict and add validation
+                    ingested_message = {
+                        "timestamp": message_ts,
+                        "df": df,
+                    }
+                    self.queue_ingested.put(ingested_message)
                     self.logger.info(color(f"Message successfully ingested from topic '{self.topic}'.", "green"))
                 except queue.Full:
                     self.logger.warning(color("Queue is full. Message will be dropped.", "yellow"))
