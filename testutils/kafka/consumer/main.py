@@ -10,6 +10,8 @@ program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 """
 
 import logging
+import os
+import time
 
 from multiprocessing import Queue
 
@@ -43,15 +45,27 @@ def main():
     try:
         while True:
 
-            df = queue_ingested.get()
+            # expected format for ingested messages: {'timestamp': (str), 'df': (pd.DataFrame)}
+            ingested_message = queue_ingested.get()
+            ingested_message_timestamp = ingested_message['timestamp']
+            df = ingested_message['df']
             print("Dataframe head:")
-            print(df.head())
+            print(df.head(5))
+
+            outfile = f"/tmp/{ingested_message_timestamp}.csv"
+            if not os.path.exists(outfile):
+                df.to_csv(outfile, index=False)
+                print(color(f"DataFrame saved in {outfile}\n", "green"))
+            else:
+                print(color(f"File {outfile} already exists. Skipping...", "yellow"))
+
 
     except KeyboardInterrupt:
 
         if consumer and consumer.is_alive():
             logging.info("Stopping kafka consumer process...")
             consumer.terminate()
+            consumer.join()
 
 
 if __name__ == "__main__":
