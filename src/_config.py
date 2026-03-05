@@ -16,10 +16,14 @@ import os
 from typing import TypedDict
 
 def sasl_sanity_checks(
+        security_protocol: str | None, 
         sasl_mechanism: str | None, 
         sasl_plain_username: str | None, 
         sasl_plain_password: str | None
     ):
+
+    if security_protocol not in ("PLAINTEXT", "SASL_PLAINTEXT"):
+        raise ValueError("Supported sasl_mechanism values: PLAINTEXT, SASL_PLAINTEXT")
 
     if sasl_mechanism not in ("PLAIN", None):
         raise ValueError("Supported sasl_mechanism values: PLAIN, None")
@@ -32,6 +36,7 @@ def sasl_sanity_checks(
 class KafkaConfig(TypedDict):
     addr_server: str
     topic: str
+    security_protocol: str | None
     sasl_mechanism: str | None
     sasl_plain_username: str | None
     sasl_plain_password: str | None
@@ -65,6 +70,8 @@ def parse_config(config_file: str) -> ScannerConfig:
     topic: str = config["KAFKA"]["TOPIC"]
 
     # TODO: Improve type checks of sasl_mechanism using Literal
+    security_protocol: str = config["KAFKA"].get("SECURITY_PROTOCOL", "PLAINTEXT")
+    assert security_protocol is not None
     sasl_mechanism: str | None = config["KAFKA"].get("SASL_MECHANISM", None)
     if sasl_mechanism == "None":
         sasl_mechanism = None
@@ -75,8 +82,8 @@ def parse_config(config_file: str) -> ScannerConfig:
     if sasl_plain_password == "None":
         sasl_plain_password = None
 
-    sasl_sanity_checks(sasl_mechanism, sasl_plain_username, sasl_plain_password)
-    
+    sasl_sanity_checks(security_protocol, sasl_mechanism, sasl_plain_username, sasl_plain_password)
+
     return ScannerConfig(
         interface=interface,
         ip_client=ip_client,
@@ -84,6 +91,7 @@ def parse_config(config_file: str) -> ScannerConfig:
         kafka_config=KafkaConfig(
             addr_server=addr_server,
             topic=topic,
+            security_protocol=security_protocol,
             sasl_mechanism=sasl_mechanism,
             sasl_plain_username=sasl_plain_username,
             sasl_plain_password=sasl_plain_password,

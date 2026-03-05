@@ -89,6 +89,7 @@ def main():
         topic=config["kafka_config"]["topic"],
         queue_received=queue_nfstream,
         timeout_sec=10,  # TODO: Move this parameter to config
+        security_protocol= config["kafka_config"]["security_protocol"],
         sasl_mechanism=config["kafka_config"]["sasl_mechanism"],
         sasl_plain_username=config["kafka_config"]["sasl_plain_username"],
         sasl_plain_password=config["kafka_config"]["sasl_plain_password"],
