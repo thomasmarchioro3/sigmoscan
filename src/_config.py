@@ -15,9 +15,26 @@ import os
 
 from typing import TypedDict
 
+def sasl_sanity_checks(
+        sasl_mechanism: str | None, 
+        sasl_plain_username: str | None, 
+        sasl_plain_password: str | None
+    ):
+
+    if sasl_mechanism not in ("PLAIN", None):
+        raise ValueError("Supported sasl_mechanism values: PLAIN, None")
+
+    if sasl_mechanism == "PLAIN":
+        if (sasl_plain_username is None) or (sasl_plain_password is None):
+            raise ValueError("sasl_mechanism is set to PLAIN but sasl_plain_username or sasl_plain_password is None")
+
+
 class KafkaConfig(TypedDict):
     addr_server: str
     topic: str
+    sasl_mechanism: str | None
+    sasl_plain_username: str | None
+    sasl_plain_password: str | None
 
 class ScannerConfig(TypedDict):
     interface: str | None
@@ -44,9 +61,22 @@ def parse_config(config_file: str) -> ScannerConfig:
     if not os.path.isdir(temp_pcap_path):
         os.makedirs(temp_pcap_path)
 
-    addr_server = config['KAFKA']['ADDRESS_SERVER']
-    topic = config["KAFKA"]["TOPIC"]
+    addr_server: str = config['KAFKA']['ADDRESS_SERVER']
+    topic: str = config["KAFKA"]["TOPIC"]
 
+    # TODO: Improve type checks of sasl_mechanism using Literal
+    sasl_mechanism: str | None = config["KAFKA"].get("SASL_MECHANISM", None)
+    if sasl_mechanism == "None":
+        sasl_mechanism = None
+    sasl_plain_username: str | None = config["KAFKA"].get("SASL_PLAIN_USERNAME", None)
+    if sasl_plain_username == "None":
+        sasl_plain_username = None
+    sasl_plain_password: str | None = config["KAFKA"].get("SASL_PLAIN_PASSWORD", None)
+    if sasl_plain_password == "None":
+        sasl_plain_password = None
+
+    sasl_sanity_checks(sasl_mechanism, sasl_plain_username, sasl_plain_password)
+    
     return ScannerConfig(
         interface=interface,
         ip_client=ip_client,
@@ -54,6 +84,9 @@ def parse_config(config_file: str) -> ScannerConfig:
         kafka_config=KafkaConfig(
             addr_server=addr_server,
             topic=topic,
+            sasl_mechanism=sasl_mechanism,
+            sasl_plain_username=sasl_plain_username,
+            sasl_plain_password=sasl_plain_password,
         )
     )
 

@@ -18,7 +18,7 @@ RUN rm -rf .venv && uv sync --python python3
 COPY . .
 
 RUN TEMP_DIR=$(grep -E '^\s*TEMP_PCAP_PATH\s*=' config.ini | cut -d'=' -f2 | tr -d ' \t\r') \
-		&& rm -rf "$TEMPDIR" \
+    && rm -rf "$TEMPDIR" \
     && mkdir -p "$TEMP_DIR" \
     && chown tcpdump:tcpdump "$TEMP_DIR"
 

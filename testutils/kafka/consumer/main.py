@@ -11,7 +11,6 @@ program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 
 import logging
 import os
-import time
 
 from multiprocessing import Queue
 
@@ -37,7 +36,12 @@ def main():
     queue_ingested = Queue()
 
     consumer = EngineKafkaConsumer(
-        config["addr_server"], config["topic"], queue_ingested
+        config["addr_server"], 
+        config["topic"], 
+        queue_ingested,
+        config["sasl_mechanism"],
+        config["sasl_plain_username"],
+        config["sasl_plain_password"],
     )
     consumer.start()
 

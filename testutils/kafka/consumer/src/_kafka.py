@@ -19,15 +19,20 @@ from datetime import datetime
 from multiprocessing import Process, Queue
 
 import pandas as pd
-from pandas.io.pytables import DataCol
 from kafka import KafkaConsumer
 from kafka.admin import KafkaAdminClient
-from kafka.errors import MessageSizeTooLargeError, NoBrokersAvailable
+from kafka.errors import NoBrokersAvailable
 
 from ._color import color
 
 
-def is_kafka_alive(address_server: str):
+
+def is_kafka_alive(
+        address_server: str, 
+        sasl_mechanism: None=None, 
+        sasl_plain_username: str | None=None,
+        sasl_plain_password: str | None=None,
+    ):
     """
     Check if a Kafka broker is available at the specified address and port.
 
@@ -43,11 +48,17 @@ def is_kafka_alive(address_server: str):
     """
 
     try:
-        KafkaAdminClient(
+        _ = KafkaAdminClient(
             bootstrap_servers=address_server,
             reconnect_backoff_ms=1_000,
             reconnect_backoff_max_ms=10_000,
+            sasl_mechanism=sasl_mechanism,
+            sasl_plain_username=sasl_plain_username,
+            sasl_plain_password=sasl_plain_password,
         )
+
+        print(sasl_mechanism)
+        print(sasl_plain_username)
         return True  # break when a broker is found
 
     except NoBrokersAvailable:
@@ -58,8 +69,6 @@ def is_kafka_alive(address_server: str):
                 "red",
             )
         )
-
-    return False
 
 
 class EngineKafkaConsumer(Process):
@@ -77,12 +86,18 @@ class EngineKafkaConsumer(Process):
         addr_server: str,
         topic: str,
         queue_ingested: Queue,
+        sasl_mechanism: str | None=None,
+        sasl_plain_username: str | None=None,
+        sasl_plain_password: str | None=None,
     ):
         super().__init__()
 
         self.addr_server: str = addr_server
         self.topic: str = topic
         self.queue_ingested: Queue = queue_ingested
+        self.sasl_mechanism=sasl_mechanism,
+        self.sasl_plain_username=sasl_plain_username,
+        self.sasl_plain_password=sasl_plain_password,
 
         self.logger: logging.Logger = logging.getLogger(__class__.__name__)
 
@@ -105,10 +120,13 @@ class EngineKafkaConsumer(Process):
                     auto_offset_reset="earliest",
                     enable_auto_commit=True,
                     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+                    sasl_mechanism=self.sasl_mechanism,
+                    sasl_plain_username=self.sasl_plain_username,
+                    sasl_plain_password=self.sasl_plain_password,
                 )
             except NoBrokersAvailable:
                 logging.error(
-                    f"{self.__class__} Broker not found at {self.address_server}. Retrying in 5 seconds..."
+                    f"{self.__class__} Broker not found at {self.addr_server}. Retrying in 5 seconds..."
                 )
                 time.sleep(5)
         

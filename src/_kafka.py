@@ -58,7 +58,12 @@ def generate_idmefv2_payload_report(ip_client: str, data: str) -> dict[str, Any]
 
 
 
-def is_kafka_alive(address_server: str):
+def is_kafka_alive(
+        address_server: str, 
+        sasl_mechanism: None=None, 
+        sasl_plain_username: str | None=None,
+        sasl_plain_password: str | None=None,
+    ):
     """
     Check if a Kafka broker is available at the specified address and port.
 
@@ -78,6 +83,9 @@ def is_kafka_alive(address_server: str):
             bootstrap_servers=address_server,
             reconnect_backoff_ms=1_000,
             reconnect_backoff_max_ms=10_000,
+            sasl_mechanism=sasl_mechanism,
+            sasl_plain_username=sasl_plain_username,
+            sasl_plain_password=sasl_plain_password,
         )
         return True  # break when a broker is found
 
@@ -111,6 +119,9 @@ class ScannerKafkaProducer(Process):
         topic: str,
         queue_received: Queue,
         timeout_sec: int = 10,
+        sasl_mechanism: str | None=None,
+        sasl_plain_username: str | None=None,
+        sasl_plain_password: str | None=None,
     ):
 
         super().__init__()
@@ -120,6 +131,9 @@ class ScannerKafkaProducer(Process):
         self.topic: str = topic
         self.queue_received: Queue = queue_received
         self.timeout_sec: int = timeout_sec
+        self.sasl_mechanism=sasl_mechanism,
+        self.sasl_plain_username=sasl_plain_username,
+        self.sasl_plain_password=sasl_plain_password,
 
         self.logger: logging.Logger = logging.getLogger(__class__.__name__)
 
@@ -136,8 +150,8 @@ class ScannerKafkaProducer(Process):
                 color(
                     f"FATAL - Kafka broker not found at {self.addr_server}.",
                     "red",
-                )
             )
+        )
 
         while True:
 
@@ -153,6 +167,9 @@ class ScannerKafkaProducer(Process):
                     bootstrap_servers=self.addr_server,
                     compression_type="gzip",
                     value_serializer=lambda x: json.dumps(x).encode("utf-8"),
+                    sasl_mechanism=self.sasl_mechanism,
+                    sasl_plain_username=self.sasl_plain_username,
+                    sasl_plain_password=self.sasl_plain_password,
                 )
 
                 future = producer.send(self.topic, report_data)

@@ -11,8 +11,11 @@ program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 
 import os
 
+from kafka.admin.client import logging
 import nfstream
 import pandas as pd
+
+from ._color import color
 
 
 DEFAULT_ATTRIBUTES = [
@@ -204,8 +207,10 @@ def get_df_from_pcap(
 
     if conn_df is None:
         conn_df = pd.DataFrame(columns=use_attributes)
+        logging.info(color(f"WARNING: Empty dataframe created for {pcap_file} (conn_df was None)", "yellow"))
     elif len(conn_df) == 0:
         conn_df = pd.DataFrame(columns=use_attributes)
+        logging.info(color(f"WARNING: Empty dataframe created for {pcap_file} (conn_df had len 0)", "yellow"))
     else:
         conn_df = conn_df.reindex(columns=use_attributes)
 

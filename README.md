@@ -5,10 +5,15 @@ This tool can be used to monitor an interface, collect network packets, and extr
 ## Requirements
 
 - Docker 
+- (Optional) Docker Compose
 
 ## Configuration
 
-SigmoScan can be configured using the `config.ini` file.
+SigmoScan can be configured using the `config.ini` file. Use `example_config.ini` as a template.
+```sh
+cp example_config.ini config.ini
+```
+
 Important parameters are:
 
 - `[SCANNER]`
@@ -21,6 +26,8 @@ Important parameters are:
 
 ## Deployment
 
+### With Docker
+
 SigmoScan can be deployed by building the `Dockerfile` in the root directory.
 
 ```sh
@@ -28,6 +35,16 @@ docker build . -t sigmoscan:latest && docker run -it --rm --network=host --cap-a
 ```
 
 DISCLAIMER: Since SigmoScan heavily relies on Python multiprocessing, its default resource consumption can be large (2-3 full CPU cores). One can set, e.g., `--cpus=1.0` for `docker run` to limit the number of cores used by SigmoScan to 1.
+
+
+### With Docker Compose
+
+```sh
+docker compose up --build
+```
+
+NOTE: The `--build` option can be omitted whenever the `config.ini` file is not changed.
+
 
 ## Dev
 

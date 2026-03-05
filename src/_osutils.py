@@ -38,14 +38,15 @@ class TempPcapHandler:
 
         ]
         
-        if len(pcap_files) == 0:
+        if len(pcap_files) <= 1:
             self.temp_pcap_files_ready = []
+            return
 
-        # filter by mtime (files that don't have an mtime > rotate_time are likely still be written by tcpdump)
-        self.temp_pcap_files_ready = sorted([
-            filepath for filepath in pcap_files if os.path.getmtime(filepath) > self.rotate_every_t_seconds
-        ])
         
+        # NOTE: The solution with os.path.getmtime does not work since tcpdump writing on the file some reasons doesn't update the file's mtime
+        self.temp_pcap_files_ready = sorted(pcap_files, key=lambda filepath: os.path.getmtime(filepath))[:-1]
+
+
 
     def get_next_pcap_file(self) -> str | None:
         self._update_pcap_files_ready_list()

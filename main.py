@@ -89,6 +89,9 @@ def main():
         topic=config["kafka_config"]["topic"],
         queue_received=queue_nfstream,
         timeout_sec=10,  # TODO: Move this parameter to config
+        sasl_mechanism=config["kafka_config"]["sasl_mechanism"],
+        sasl_plain_username=config["kafka_config"]["sasl_plain_username"],
+        sasl_plain_password=config["kafka_config"]["sasl_plain_password"],
     )
 
     kafka_producer.start()
