@@ -57,48 +57,6 @@ def generate_idmefv2_payload_report(ip_client: str, data: str) -> dict[str, Any]
     return report
 
 
-
-def is_kafka_alive(
-        address_server: str, 
-        sasl_mechanism: None=None, 
-        sasl_plain_username: str | None=None,
-        sasl_plain_password: str | None=None,
-    ):
-    """
-    Check if a Kafka broker is available at the specified address and port.
-
-    Attempts to create a KafkaAdminClient with the given server address and port.
-    If a broker is found, returns True. If no brokers are available, logs an error
-    and returns False.
-
-    Args:
-        address_server (str): The IP address and port of the Kafka broker `<server_ip>:<port>`.
-
-    Returns:
-        bool: True if a Kafka broker is available, False otherwise.
-    """
-
-    try:
-        _ = KafkaAdminClient(
-            bootstrap_servers=address_server,
-            reconnect_backoff_ms=1_000,
-            reconnect_backoff_max_ms=10_000,
-            sasl_mechanism=sasl_mechanism,
-            sasl_plain_username=sasl_plain_username,
-            sasl_plain_password=sasl_plain_password,
-        )
-        return True  # break when a broker is found
-
-    except NoBrokersAvailable:
-        pass
-        logging.error(
-            color(
-                f"{is_kafka_alive.__name__}: Broker not found at {address_server} - Terminating connection...",
-                "red",
-            )
-        )
-
-
 # TODO: Consider switching to threading to reduce CPU and memory consumption
 class ScannerKafkaProducer(Process):
     """
@@ -119,6 +77,7 @@ class ScannerKafkaProducer(Process):
         topic: str,
         queue_received: Queue,
         timeout_sec: int = 10,
+        security_protocol: str="PLAINTEXT",
         sasl_mechanism: str | None=None,
         sasl_plain_username: str | None=None,
         sasl_plain_password: str | None=None,
@@ -131,9 +90,10 @@ class ScannerKafkaProducer(Process):
         self.topic: str = topic
         self.queue_received: Queue = queue_received
         self.timeout_sec: int = timeout_sec
-        self.sasl_mechanism=sasl_mechanism,
-        self.sasl_plain_username=sasl_plain_username,
-        self.sasl_plain_password=sasl_plain_password,
+        self.security_protocol: str=security_protocol
+        self.sasl_mechanism: str | None=sasl_mechanism
+        self.sasl_plain_username=sasl_plain_username
+        self.sasl_plain_password=sasl_plain_password
 
         self.logger: logging.Logger = logging.getLogger(__class__.__name__)
 
@@ -142,16 +102,6 @@ class ScannerKafkaProducer(Process):
         """
         Main loop of the ScannerKafkaProducer.
         """
-
-        self.logger.debug(f"Connecting to Kafka broker at {self.addr_server}...")
-
-        while not is_kafka_alive(self.addr_server):
-            self.logger.error(
-                color(
-                    f"FATAL - Kafka broker not found at {self.addr_server}.",
-                    "red",
-            )
-        )
 
         while True:
 
@@ -163,16 +113,17 @@ class ScannerKafkaProducer(Process):
             try:
 
                 report_data = generate_idmefv2_payload_report(self.ip_client, data)
+
                 producer = KafkaProducer(
                     bootstrap_servers=self.addr_server,
-                    compression_type="gzip",
-                    value_serializer=lambda x: json.dumps(x).encode("utf-8"),
+                    security_protocol=self.security_protocol,
+                    value_serializer=lambda m: json.dumps(m).encode('utf-8'),
                     sasl_mechanism=self.sasl_mechanism,
                     sasl_plain_username=self.sasl_plain_username,
                     sasl_plain_password=self.sasl_plain_password,
                 )
 
-                future = producer.send(self.topic, report_data)
+                future = producer.send('sigmoscan-topic', report_data)
                 result = future.get(timeout=self.timeout_sec)
 
                 self.logger.info(
