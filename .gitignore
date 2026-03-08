@@ -7,3 +7,6 @@ uv.lock
 !**/README.md
 
 config.ini
+
+# .cache, .config, etc
+.c*/
