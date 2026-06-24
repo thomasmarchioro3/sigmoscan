@@ -21,8 +21,7 @@ from multiprocessing import Process, Queue
 
 # External libraries
 from kafka.producer import KafkaProducer
-from kafka.admin import KafkaAdminClient
-from kafka.errors import MessageSizeTooLargeError, NoBrokersAvailable
+from kafka.errors import MessageSizeTooLargeError
 
 # Local modules
 from ._color import color
@@ -123,7 +122,11 @@ class ScannerKafkaProducer(Process):
                     sasl_plain_password=self.sasl_plain_password,
                 )
 
-                future = producer.send('sigmoscan-topic', report_data)
+                future = producer.send(self.topic, report_data)
+                if future is None:
+                    logging.error(color(f"Impossible to send message to kafka topc '{self.topic}'", "red"))
+                    continue
+
                 result = future.get(timeout=self.timeout_sec)
 
                 self.logger.info(
@@ -135,11 +138,6 @@ class ScannerKafkaProducer(Process):
 
                 self.logger.debug(f"{str(result)}")
 
-            except NoBrokersAvailable:
-                self.logger.error(
-                    color(f"Broker not found at {self.addr_server}. Retrying...", "yellow")
-                )
-                time.sleep(5)
 
             except MessageSizeTooLargeError:
                 # TODO: Implement a backup queue to store messages that are too large
@@ -152,5 +150,10 @@ class ScannerKafkaProducer(Process):
                 time.sleep(5)
                 pass
 
+            except Exception as e:
+                self.logger.error(
+                    #color(f"Broker not found at {self.addr_server}. Retrying...", "yellow")
+                    color(f"{e}", "red")
+                )
 
 
