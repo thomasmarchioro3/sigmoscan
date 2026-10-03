@@ -2,8 +2,8 @@ name: Weekly dependency audit
 
 on:
   schedule:
-    # every Monday at 06:07 (UTC)
-    - cron: "7 6 * * 1"
+    # every Monday at 07:06 (UTC)
+    - cron: "6 7 * * 1"
   workflow_dispatch: # Also allow manual runs
 
 permissions:
