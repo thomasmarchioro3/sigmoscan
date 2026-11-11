@@ -3,3 +3,5 @@ __pycache__
 *.pyc
 *.pyo
 .git
+# Certificates are mounted at runtime (see docker-compose.yml), never copied into the image
+certs

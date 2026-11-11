@@ -7,5 +7,8 @@ services:
       - NET_ADMIN
       - NET_RAW
     cpus: 1.0
+    volumes:
+      # Kafka certificates for SASL_SSL, read-only
+      - ./certs:/app/certs:ro
     stdin_open: true
     tty: true

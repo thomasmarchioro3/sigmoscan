@@ -6,5 +6,9 @@
 
 config.ini
 
+# Kafka certificates and keys (see README, SASL_SSL)
+certs/*
+!certs/.gitkeep
+
 # .cache, .config, etc
 .c*/
