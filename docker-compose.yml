@@ -7,6 +7,10 @@ services:
       - NET_ADMIN
       - NET_RAW
     cpus: 1.0
+    env_file:
+      # Kafka connection settings (see .env.example)
+      - path: .env
+        required: false
     volumes:
       # Kafka certificates for SASL_SSL, read-only
       - ./certs:/app/certs:ro

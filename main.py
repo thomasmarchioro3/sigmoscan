@@ -29,6 +29,9 @@ from src.osutils import TempPcapHandler
 
 DEFAULT_CONFIG_FILE: str = "config.ini"
 
+# Kafka connection settings (address, topic, credentials, certificates)
+DEFAULT_ENV_FILE: str = ".env"
+
 # How long to wait before checking again when no pcap file is ready
 POLL_INTERVAL_SEC: float = 0.5
 
@@ -43,6 +46,10 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--configfile", type=str, default=DEFAULT_CONFIG_FILE, help="Path to config file")
+    parser.add_argument(
+        "--envfile", type=str, default=DEFAULT_ENV_FILE,
+        help="Path to the .env file with the Kafka connection settings. Environment variables with the same names take priority.",
+    )
     parser.add_argument("--savelog", action="store_true", help="If used, stores logs in file in `scanner_<timestamp_ns>.log`")
     parser.add_argument("--debug", action="store_true", help="If used, sets the log level to DEBUG.")
     args = parser.parse_args()
@@ -66,7 +73,7 @@ def main():
     )
 
     logging.getLogger("kafka").setLevel(KAFKA_LOG_LEVEL)
-    config = parse_config(configfile)
+    config = parse_config(configfile, args.envfile)
 
     print(ASCII_ART)
     logging.info(f"Config: {mask_secrets(config)}")

@@ -17,7 +17,8 @@ A single-node Kafka broker (`apache/kafka:4.0.0`, KRaft) for testing SigmoScan w
 ├── gen-certs.sh         makes the files in secrets/ and sigmoscan/
 ├── secrets/             broker files: CA certificate, broker keystore
 ├── sigmoscan/           client files: CA certificate, client certificate, client key
-└── client.env           settings for the example-new-kafka/ clients
+├── client.env           settings for the example-new-kafka/ clients
+└── sigmoscan.env        settings for SigmoScan (use with --envfile or docker run --env-file)
 ```
 
 ## Credentials
@@ -53,26 +54,23 @@ Notes:
 
 ## Use it with SigmoScan
 
-In `config.ini` at the root of the repository:
+`sigmoscan.env` has the connection settings for this broker. In `config.ini` at the root of the repository, set:
 
 ```ini
 [KAFKA]
-IP_CLIENT=127.0.0.1
-ADDRESS_SERVER=127.0.0.1:9092
-TOPIC=network
 SECURITY_PROTOCOL=SASL_SSL
 SASL_MECHANISM=PLAIN
-SASL_PLAIN_USERNAME=sigmoscan
-SASL_PLAIN_PASSWORD=sigmoscan-secret
-SSL_CAFILE=testutils/kafka-sasl-ssl/sigmoscan/kafka-ca-1.crt
-SSL_CERTFILE=testutils/kafka-sasl-ssl/sigmoscan/sigmoscan.certificate.pem
-SSL_KEYFILE=testutils/kafka-sasl-ssl/sigmoscan/sigmoscan.key
-SSL_PASSWORD=sigmoscan-key-password
 ```
 
-These paths also work when SigmoScan runs in Docker, because the SigmoScan image contains `testutils/`.
+Then start SigmoScan with `sigmoscan.env` instead of `.env`:
 
-Then run `make run`. Expected log line, once per `ROTATE_EVERY_T_SEC`:
+```sh
+uv run main.py --envfile testutils/kafka-sasl-ssl/sigmoscan.env
+```
+
+The certificate paths in `sigmoscan.env` start from the folder of `config.ini`. They also work when SigmoScan runs in Docker (`docker run --env-file testutils/kafka-sasl-ssl/sigmoscan.env ...`), because the SigmoScan image contains `testutils/`.
+
+Expected log line, once per `ROTATE_EVERY_T_SEC`:
 
 ```
 Message sent successfully to topic 'network'.
@@ -103,7 +101,7 @@ Last line: `broker ready`
 
 ### 2. Write the SigmoScan config for the test
 
-This writes a separate config file, so your `config.ini` does not change. Step 3 mounts it as `/app/config.ini` in the container, so the certificate paths start from `/app`.
+This writes a separate config file, so your `config.ini` does not change. Step 3 mounts it as `/app/config.ini` in the container. The connection settings come from `sigmoscan.env`.
 
 ```sh
 cat > testutils/kafka-sasl-ssl/e2e_config.ini <<'EOF'
@@ -115,16 +113,8 @@ ROTATE_EVERY_T_SEC=5
 
 [KAFKA]
 IP_CLIENT=10.99.99.99
-ADDRESS_SERVER=127.0.0.1:9092
-TOPIC=network
 SECURITY_PROTOCOL=SASL_SSL
 SASL_MECHANISM=PLAIN
-SASL_PLAIN_USERNAME=sigmoscan
-SASL_PLAIN_PASSWORD=sigmoscan-secret
-SSL_CAFILE=testutils/kafka-sasl-ssl/sigmoscan/kafka-ca-1.crt
-SSL_CERTFILE=testutils/kafka-sasl-ssl/sigmoscan/sigmoscan.certificate.pem
-SSL_KEYFILE=testutils/kafka-sasl-ssl/sigmoscan/sigmoscan.key
-SSL_PASSWORD=sigmoscan-key-password
 EOF
 ```
 
@@ -132,11 +122,12 @@ EOF
 
 ### 3. Build and start SigmoScan
 
-The build copies `testutils/kafka-sasl-ssl/` into the image, so the certificate paths exist in the container. The `sigmoscan:e2e` tag keeps your `sigmoscan:latest` image unchanged.
+The build copies `testutils/kafka-sasl-ssl/` into the image, so the certificate paths in `sigmoscan.env` exist in the container. The `sigmoscan:e2e` tag keeps your `sigmoscan:latest` image unchanged.
 
 ```sh
 docker build . -t sigmoscan:e2e
 docker run -d --name sigmoscan-e2e --network=host --cap-add=NET_ADMIN --cap-add=NET_RAW --cpus=1.0 \
+    --env-file testutils/kafka-sasl-ssl/sigmoscan.env \
     -v "$(pwd)/testutils/kafka-sasl-ssl/e2e_config.ini:/app/config.ini:ro" \
     sigmoscan:e2e
 docker logs -f sigmoscan-e2e

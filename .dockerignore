@@ -5,3 +5,6 @@ __pycache__
 .git
 # Certificates are mounted at runtime (see docker-compose.yml), never copied into the image
 certs
+# Kafka connection settings are passed at runtime (env_file / --env-file), never copied into the image.
+# **/ also excludes example-new-kafka/.env
+**/.env
