@@ -9,9 +9,10 @@ You should have received a copy of the license along with this
 program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 """
 
+import logging
 import os
+import tempfile
 
-from kafka.admin.client import logging
 import nfstream
 import pandas as pd
 
@@ -158,10 +159,10 @@ def get_df_from_pcap(
         ValueError: If any of the specified attributes are invalid.
     """
     if use_attributes is None:
-        use_attributes = ALL_ATTRIBUTES
-        use_attributes.append("timestamp")
+        use_attributes = ALL_ATTRIBUTES + ["timestamp"]
 
-    use_attributes = list(set(use_attributes))
+    # Remove duplicates but keep the order, so the columns are the same in every run
+    use_attributes = list(dict.fromkeys(use_attributes))
 
     if any(attr not in ALL_ATTRIBUTES for attr in use_attributes if attr != "timestamp"):
         raise ValueError(
@@ -194,16 +195,23 @@ def get_df_from_pcap(
         system_visibility_poll_ms=100,
     )
 
-    try:
-        streamer.to_csv("/tmp/nfstream-temp.csv")
-    except ValueError:
-        pass
+    # Unique temp file, so that parallel runs do not overwrite each other's output
+    fd, csv_path = tempfile.mkstemp(prefix="nfstream-", suffix=".csv")
+    os.close(fd)
 
     conn_df = None
-    if os.path.exists("/tmp/nfstream-temp.csv"):
-        conn_df = pd.read_csv("/tmp/nfstream-temp.csv", index_col=0)
-        conn_df["timestamp"] = conn_df["bidirectional_first_seen_ms"]
-        os.remove("/tmp/nfstream-temp.csv")
+    try:
+        try:
+            streamer.to_csv(csv_path)
+        except ValueError:
+            pass
+
+        # NFStream writes nothing to the file when the pcap has no flows
+        if os.path.getsize(csv_path) > 0:
+            conn_df = pd.read_csv(csv_path)
+            conn_df["timestamp"] = conn_df["bidirectional_first_seen_ms"]
+    finally:
+        os.remove(csv_path)
 
     if conn_df is None:
         conn_df = pd.DataFrame(columns=use_attributes)

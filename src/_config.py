@@ -45,7 +45,30 @@ class ScannerConfig(TypedDict):
     interface: str | None
     ip_client: ipaddress.IPv4Address | ipaddress.IPv6Address
     temp_pcap_path: str
+    rotate_every_t_sec: int
     kafka_config: KafkaConfig
+
+
+DEFAULT_ROTATE_EVERY_T_SEC: int = 10
+
+
+def parse_rotate_every_t_sec(value: str | None) -> int:
+    """
+    Parses ROTATE_EVERY_T_SEC. tcpdump -G only accepts whole seconds, so the
+    value must be an integer >= 1. Returns the default if the value is missing.
+    """
+    if value is None:
+        return DEFAULT_ROTATE_EVERY_T_SEC
+
+    try:
+        seconds = int(value)
+    except ValueError:
+        raise ValueError(f"ROTATE_EVERY_T_SEC in section [SCANNER] must be a whole number of seconds, got '{value}'")
+
+    if seconds < 1:
+        raise ValueError(f"ROTATE_EVERY_T_SEC in section [SCANNER] must be at least 1, got {seconds}")
+
+    return seconds
 
 
 def parse_config(config_file: str) -> ScannerConfig:
@@ -65,6 +88,8 @@ def parse_config(config_file: str) -> ScannerConfig:
     temp_pcap_path = config["SCANNER"]["TEMP_PCAP_PATH"]
     if not os.path.isdir(temp_pcap_path):
         os.makedirs(temp_pcap_path)
+
+    rotate_every_t_sec = parse_rotate_every_t_sec(config["SCANNER"].get("ROTATE_EVERY_T_SEC"))
 
     addr_server: str = config['KAFKA']['ADDRESS_SERVER']
     topic: str = config["KAFKA"]["TOPIC"]
@@ -88,6 +113,7 @@ def parse_config(config_file: str) -> ScannerConfig:
         interface=interface,
         ip_client=ip_client,
         temp_pcap_path=temp_pcap_path,
+        rotate_every_t_sec=rotate_every_t_sec,
         kafka_config=KafkaConfig(
             addr_server=addr_server,
             topic=topic,

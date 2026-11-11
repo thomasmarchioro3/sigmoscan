@@ -18,6 +18,7 @@ Important parameters are:
 
 - `[SCANNER]`
     - `INTERFACE` The network interface to be monitored. You can display available interfaces by running `ip a` on most linux machines.
+    - `ROTATE_EVERY_T_SEC` How often (in seconds) a new pcap file is started and the flows of the previous one are sent to Kafka. Must be a whole number of at least 1. Default: `10`.
 
 
 - `[KAFKA]`

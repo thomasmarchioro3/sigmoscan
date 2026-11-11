@@ -12,7 +12,6 @@ program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 import json
 import logging
 import queue
-import time
 import uuid
 from typing import Any
 
@@ -97,15 +96,37 @@ class ScannerKafkaProducer(Process):
         self.logger: logging.Logger = logging.getLogger(__class__.__name__)
 
 
+    def _create_producer(self) -> KafkaProducer:
+        return KafkaProducer(
+            bootstrap_servers=self.addr_server,
+            security_protocol=self.security_protocol,
+            value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+            sasl_mechanism=self.sasl_mechanism,
+            sasl_plain_username=self.sasl_plain_username,
+            sasl_plain_password=self.sasl_plain_password,
+        )
+
     def run(self):
         """
         Main loop of the ScannerKafkaProducer.
+
+        One KafkaProducer is created and reused for all messages. It reconnects
+        by itself if the broker goes down and comes back. If creating it fails
+        (e.g. the broker is unreachable at startup), creation is tried again
+        with the next message.
+
+        A timeout on `future.get` only means the message was not confirmed in
+        `timeout_sec`. KafkaProducer keeps trying to deliver it in the
+        background until its `delivery_timeout_ms` (default 120 s) runs out.
         """
+
+        producer: KafkaProducer | None = None
 
         while True:
 
             try:
-                data: str = self.queue_received.get_nowait()
+                # Block until data arrives, instead of polling without pause
+                data: str = self.queue_received.get(timeout=1)
             except queue.Empty:
                 continue
 
@@ -113,18 +134,12 @@ class ScannerKafkaProducer(Process):
 
                 report_data = generate_idmefv2_payload_report(self.ip_client, data)
 
-                producer = KafkaProducer(
-                    bootstrap_servers=self.addr_server,
-                    security_protocol=self.security_protocol,
-                    value_serializer=lambda m: json.dumps(m).encode('utf-8'),
-                    sasl_mechanism=self.sasl_mechanism,
-                    sasl_plain_username=self.sasl_plain_username,
-                    sasl_plain_password=self.sasl_plain_password,
-                )
+                if producer is None:
+                    producer = self._create_producer()
 
                 future = producer.send(self.topic, report_data)
                 if future is None:
-                    logging.error(color(f"Impossible to send message to kafka topc '{self.topic}'", "red"))
+                    self.logger.error(color(f"Impossible to send message to kafka topic '{self.topic}'", "red"))
                     continue
 
                 result = future.get(timeout=self.timeout_sec)
@@ -140,20 +155,15 @@ class ScannerKafkaProducer(Process):
 
 
             except MessageSizeTooLargeError:
+                # The connection is fine, so the producer is kept
                 # TODO: Implement a backup queue to store messages that are too large
                 self.logger.error(
                     color(f"FATAL - Message too large.", "red")
                 )
 
-            except queue.Full:
-                self.logger.error(color(f"Queue is full.", "red"))
-                time.sleep(5)
-                pass
-
             except Exception as e:
-                self.logger.error(
-                    #color(f"Broker not found at {self.addr_server}. Retrying...", "yellow")
-                    color(f"{e}", "red")
-                )
+                # The producer is kept: closing it fails while the broker is
+                # down, and it reconnects by itself when the broker is back.
+                self.logger.error(color(f"{e}", "red"))
 
 

@@ -29,6 +29,9 @@ from src.osutils import TempPcapHandler
 
 DEFAULT_CONFIG_FILE: str = "config.ini"
 
+# How long to wait before checking again when no pcap file is ready
+POLL_INTERVAL_SEC: float = 0.5
+
 
 def main():
 
@@ -42,8 +45,6 @@ def main():
     if not os.path.isfile(configfile):
         error_msg= f"Config file {configfile} not found."
         raise ValueError(error_msg)
-
-    rotate_every_t_seconds: float = 10
 
     savelogs: bool = args.savelog
     handlers: list[logging.Handler] = [logging.StreamHandler()]
@@ -66,6 +67,7 @@ def main():
     logging.info(f"Config: {config}")
 
     temp_dir = config["temp_pcap_path"]
+    rotate_every_t_seconds = config["rotate_every_t_sec"]
     temp_pcap_handler = TempPcapHandler(temp_dir, rotate_every_t_seconds)
     temp_pcap_handler.clean_pcap_files()
 
@@ -79,7 +81,7 @@ def main():
      # Start processes
     tcpdump_process = capture_live_interface(
         interface=config["interface"],
-        rotate_every_t_sec=rotate_every_t_seconds,  # TODO: Move this parameter to config
+        rotate_every_t_sec=rotate_every_t_seconds,
         temp_dir=temp_dir,
     )
 
@@ -109,6 +111,7 @@ def main():
                         logging.error(color(f"{err}", "red"))
                         raise KeyboardInterrupt
 
+                time.sleep(POLL_INTERVAL_SEC)
                 continue
 
             df = get_df_from_pcap(pcap_file)
@@ -117,7 +120,7 @@ def main():
                 logging.error(f"Failed to process pcap: {pcap_file}. Returned data is not a pandas DataFrame, but {type(df)}.")
                 continue
 
-            data = df.to_csv()
+            data = df.to_csv(index=False)
             queue_nfstream.put(data)
             logging.debug(f"Deleting temp pcap: {pcap_file}")
 
