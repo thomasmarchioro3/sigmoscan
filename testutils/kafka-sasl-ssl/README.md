@@ -117,10 +117,12 @@ docker compose up --build -d
 
 ## What a wrong config looks like
 
-| Client config | Broker log | SigmoScan log |
+| Client config | Broker log | SigmoScan log (from kafka-python) |
 | --- | --- | --- |
-| Wrong SASL password | `Authentication failed: Invalid username or password` | `KafkaTimeoutError: Unable to bootstrap from 127.0.0.1:9092` |
-| No client certificate | `SSL handshake failed` | same |
-| Wrong key password | nothing (the client fails before it connects) | same |
+| Wrong SASL password | `Authentication failed: Invalid username or password` | `Connection lost: KafkaConnectionError: socket disconnected` |
+| No client certificate | `SSL handshake failed` | `[SSL: SSLV3_ALERT_BAD_CERTIFICATE] ssl/tls alert bad certificate`, with a traceback |
+| Wrong key password | nothing (the client fails before it connects) | `Connection failed: [SSL] PEM lib` |
 
-SigmoScan logs this error about 30 seconds after the first message, because the producer tries to connect for that long before it gives up. The log does not say which of the three problems it is: check the broker log with `docker logs kafka-sasl-ssl`.
+These lines repeat at each reconnect attempt. About 30 seconds after the first message, SigmoScan also logs `KafkaTimeoutError: Unable to bootstrap from 127.0.0.1:9092`.
+
+kafka-python does not report the reason for a wrong SASL password: it only sees that the broker closes the connection. Check the broker log with `docker logs kafka-sasl-ssl`.

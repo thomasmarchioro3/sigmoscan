@@ -32,6 +32,12 @@ DEFAULT_CONFIG_FILE: str = "config.ini"
 # How long to wait before checking again when no pcap file is ready
 POLL_INTERVAL_SEC: float = 0.5
 
+# Log level of kafka-python. WARNING shows the cause of connection errors
+# (broker unreachable, TLS errors, wrong key password).
+# Never set it to DEBUG, also not with --debug: at DEBUG, kafka-python logs
+# the SASL password in plain text.
+KAFKA_LOG_LEVEL: int = logging.WARNING
+
 
 def main():
 
@@ -59,8 +65,7 @@ def main():
         format = r"[%(asctime)s][%(name)s][%(levelname)s] %(message)s",
     )
 
-    # disable Kafka logs
-    logging.getLogger("kafka").setLevel(1000)
+    logging.getLogger("kafka").setLevel(KAFKA_LOG_LEVEL)
     config = parse_config(configfile)
 
     print(ASCII_ART)
