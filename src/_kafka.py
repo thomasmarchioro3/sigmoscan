@@ -24,6 +24,7 @@ from kafka.errors import MessageSizeTooLargeError
 
 # Local modules
 from ._color import color
+from ._config import KafkaConfig
 
 
 def generate_idmefv2_payload_report(ip_client: str, data: str) -> dict[str, Any]:
@@ -62,8 +63,8 @@ class ScannerKafkaProducer(Process):
 
     Args:
         ip_client (str): Client IP (Local IP, only used for logging info in the IDMEFv2 file)
-        addr_server (str): Server address `<server_ip>:<port>`.
-        topic (str): The Kafka topic where the message is posted.
+        kafka_config (KafkaConfig): Server address, topic, and SASL/SSL
+            settings, as returned by `parse_config`.
         queue_received (Queue): The queue listing the received files (formatted as strings).
         timeout_sec (int): Timeout for the producer.
     """
@@ -71,39 +72,38 @@ class ScannerKafkaProducer(Process):
     def __init__(
         self,
         ip_client: str,
-        addr_server: str,
-        topic: str,
+        kafka_config: KafkaConfig,
         queue_received: Queue,
         timeout_sec: int = 10,
-        security_protocol: str="PLAINTEXT",
-        sasl_mechanism: str | None=None,
-        sasl_plain_username: str | None=None,
-        sasl_plain_password: str | None=None,
     ):
 
         super().__init__()
 
         self.ip_client: str = ip_client
-        self.addr_server: str = addr_server
-        self.topic: str = topic
+        self.kafka_config: KafkaConfig = kafka_config
+        self.topic: str = kafka_config["topic"]
         self.queue_received: Queue = queue_received
         self.timeout_sec: int = timeout_sec
-        self.security_protocol: str=security_protocol
-        self.sasl_mechanism: str | None=sasl_mechanism
-        self.sasl_plain_username=sasl_plain_username
-        self.sasl_plain_password=sasl_plain_password
 
         self.logger: logging.Logger = logging.getLogger(__class__.__name__)
 
 
     def _create_producer(self) -> KafkaProducer:
+        cfg = self.kafka_config
         return KafkaProducer(
-            bootstrap_servers=self.addr_server,
-            security_protocol=self.security_protocol,
+            bootstrap_servers=cfg["addr_server"],
+            security_protocol=cfg["security_protocol"],
             value_serializer=lambda m: json.dumps(m).encode('utf-8'),
-            sasl_mechanism=self.sasl_mechanism,
-            sasl_plain_username=self.sasl_plain_username,
-            sasl_plain_password=self.sasl_plain_password,
+            sasl_mechanism=cfg["sasl_mechanism"],
+            sasl_plain_username=cfg["sasl_plain_username"],
+            sasl_plain_password=cfg["sasl_plain_password"],
+            # All None (and check_hostname True) unless the protocol is SASL_SSL,
+            # which are the KafkaProducer defaults.
+            ssl_cafile=cfg["ssl_cafile"],
+            ssl_certfile=cfg["ssl_certfile"],
+            ssl_keyfile=cfg["ssl_keyfile"],
+            ssl_password=cfg["ssl_password"],
+            ssl_check_hostname=cfg["ssl_check_hostname"],
         )
 
     def run(self):

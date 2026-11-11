@@ -87,14 +87,9 @@ def main():
 
     kafka_producer = ScannerKafkaProducer(
         ip_client=str(config["ip_client"]),
-        addr_server=config["kafka_config"]["addr_server"],
-        topic=config["kafka_config"]["topic"],
+        kafka_config=config["kafka_config"],
         queue_received=queue_nfstream,
         timeout_sec=10,  # TODO: Move this parameter to config
-        security_protocol= config["kafka_config"]["security_protocol"],
-        sasl_mechanism=config["kafka_config"]["sasl_mechanism"],
-        sasl_plain_username=config["kafka_config"]["sasl_plain_username"],
-        sasl_plain_password=config["kafka_config"]["sasl_plain_password"],
     )
 
     kafka_producer.start()
