@@ -8,7 +8,7 @@ services:
       - NET_RAW
     cpus: 1.0
     env_file:
-      # Kafka connection settings (see .env.example)
+      # Kafka connection settings (see example.env)
       - path: .env
         required: false
     volumes:

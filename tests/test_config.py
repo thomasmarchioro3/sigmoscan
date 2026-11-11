@@ -12,7 +12,7 @@ IP_CLIENT=172.42.0.11
 SASL_MECHANISM=PLAIN
 """
 
-# .env lines shared by all tests, as in .env.example
+# .env lines shared by all tests, as in example.env
 BASE_ENV = """\
 KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092
 KAFKA_TOPIC=network

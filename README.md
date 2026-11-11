@@ -12,11 +12,11 @@ This tool can be used to monitor an interface, collect network packets, and extr
 SigmoScan reads two files:
 
 - `config.ini`: the scanner settings and how to connect to Kafka (protocol, SASL mechanism). Use `example_config.ini` as a template.
-- `.env`: the Kafka connection settings, including the secrets (address, topic, credentials, certificates). Use `.env.example` as a template. The variable names are the same as in `example-new-kafka/`.
+- `.env`: the Kafka connection settings, including the secrets (address, topic, credentials, certificates). Use `example.env` as a template. The variable names are the same as in `example-new-kafka/`.
 
 ```sh
 cp example_config.ini config.ini
-cp .env.example .env
+cp example.env .env
 ```
 
 Git ignores `config.ini` and `.env`, and Docker never copies `.env` into the image.
