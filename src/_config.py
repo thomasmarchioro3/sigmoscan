@@ -11,19 +11,63 @@ program. If not, see <https://creativecommons.org/licenses/by-nc-sa/4.0/>.
 
 import configparser
 import ipaddress
+import logging
 import os
 
 from typing import TypedDict
 
+
+DEFAULT_ROTATE_EVERY_T_SEC: int = 10
+
+SUPPORTED_SECURITY_PROTOCOLS: tuple[str, ...] = ("PLAINTEXT", "SASL_PLAINTEXT", "SASL_SSL")
+
+# Keys of the [KAFKA] section that are only used with SASL_SSL
+SSL_KEYS: tuple[str, ...] = ("SSL_CAFILE", "SSL_CERTFILE", "SSL_KEYFILE", "SSL_PASSWORD", "SSL_CHECK_HOSTNAME")
+
+
+def _get_optional(section: configparser.SectionProxy, key: str) -> str | None:
+    """
+    Returns the value of `key`, or None if the key is missing or set to the
+    string "None".
+    """
+    value = section.get(key, None)
+    if value is None or value == "None":
+        return None
+    return value
+
+
+def _resolve_path(path: str | None, base_dir: str) -> str | None:
+    """
+    Makes a relative path absolute, starting from `base_dir` (the folder of the
+    config file), so the result does not depend on the current directory.
+    """
+    if path is None:
+        return None
+    if not os.path.isabs(path):
+        path = os.path.join(base_dir, path)
+    return os.path.normpath(path)
+
+
+def _parse_bool(value: str | None, key: str, default: bool) -> bool:
+    if value is None:
+        return default
+    states = configparser.ConfigParser.BOOLEAN_STATES
+    if value.lower() not in states:
+        raise ValueError(f"{key} in section [KAFKA] must be true or false, got '{value}'")
+    return states[value.lower()]
+
+
 def sasl_sanity_checks(
-        security_protocol: str | None, 
-        sasl_mechanism: str | None, 
-        sasl_plain_username: str | None, 
+        security_protocol: str | None,
+        sasl_mechanism: str | None,
+        sasl_plain_username: str | None,
         sasl_plain_password: str | None
     ):
 
-    if security_protocol not in ("PLAINTEXT", "SASL_PLAINTEXT"):
-        raise ValueError("Supported sasl_mechanism values: PLAINTEXT, SASL_PLAINTEXT")
+    if security_protocol not in SUPPORTED_SECURITY_PROTOCOLS:
+        raise ValueError(
+            f"Supported security_protocol values: {', '.join(SUPPORTED_SECURITY_PROTOCOLS)}, got '{security_protocol}'"
+        )
 
     if sasl_mechanism not in ("PLAIN", None):
         raise ValueError("Supported sasl_mechanism values: PLAIN, None")
@@ -33,6 +77,24 @@ def sasl_sanity_checks(
             raise ValueError("sasl_mechanism is set to PLAIN but sasl_plain_username or sasl_plain_password is None")
 
 
+def ssl_sanity_checks(
+        ssl_cafile: str | None,
+        ssl_certfile: str | None,
+        ssl_keyfile: str | None,
+        ssl_password: str | None,
+    ):
+
+    if (ssl_certfile is None) != (ssl_keyfile is None):
+        raise ValueError("SSL_CERTFILE and SSL_KEYFILE in section [KAFKA] must be both set or both unset")
+
+    if ssl_password is not None and ssl_keyfile is None:
+        raise ValueError("SSL_PASSWORD is set in section [KAFKA] but SSL_KEYFILE is not")
+
+    for key, path in (("SSL_CAFILE", ssl_cafile), ("SSL_CERTFILE", ssl_certfile), ("SSL_KEYFILE", ssl_keyfile)):
+        if path is not None and not os.path.isfile(path):
+            raise ValueError(f"{key} in section [KAFKA]: file not found: {path}")
+
+
 class KafkaConfig(TypedDict):
     addr_server: str
     topic: str
@@ -40,6 +102,11 @@ class KafkaConfig(TypedDict):
     sasl_mechanism: str | None
     sasl_plain_username: str | None
     sasl_plain_password: str | None
+    ssl_cafile: str | None
+    ssl_certfile: str | None
+    ssl_keyfile: str | None
+    ssl_password: str | None
+    ssl_check_hostname: bool
 
 class ScannerConfig(TypedDict):
     interface: str | None
@@ -47,9 +114,6 @@ class ScannerConfig(TypedDict):
     temp_pcap_path: str
     rotate_every_t_sec: int
     kafka_config: KafkaConfig
-
-
-DEFAULT_ROTATE_EVERY_T_SEC: int = 10
 
 
 def parse_rotate_every_t_sec(value: str | None) -> int:
@@ -94,20 +158,40 @@ def parse_config(config_file: str) -> ScannerConfig:
     addr_server: str = config['KAFKA']['ADDRESS_SERVER']
     topic: str = config["KAFKA"]["TOPIC"]
 
+    kafka_section = config["KAFKA"]
+
     # TODO: Improve type checks of sasl_mechanism using Literal
-    security_protocol: str = config["KAFKA"].get("SECURITY_PROTOCOL", "PLAINTEXT")
+    security_protocol: str = kafka_section.get("SECURITY_PROTOCOL", "PLAINTEXT")
     assert security_protocol is not None
-    sasl_mechanism: str | None = config["KAFKA"].get("SASL_MECHANISM", None)
-    if sasl_mechanism == "None":
-        sasl_mechanism = None
-    sasl_plain_username: str | None = config["KAFKA"].get("SASL_PLAIN_USERNAME", None)
-    if sasl_plain_username == "None":
-        sasl_plain_username = None
-    sasl_plain_password: str | None = config["KAFKA"].get("SASL_PLAIN_PASSWORD", None)
-    if sasl_plain_password == "None":
-        sasl_plain_password = None
+    sasl_mechanism = _get_optional(kafka_section, "SASL_MECHANISM")
+    sasl_plain_username = _get_optional(kafka_section, "SASL_PLAIN_USERNAME")
+    sasl_plain_password = _get_optional(kafka_section, "SASL_PLAIN_PASSWORD")
 
     sasl_sanity_checks(security_protocol, sasl_mechanism, sasl_plain_username, sasl_plain_password)
+
+    ssl_cafile: str | None = None
+    ssl_certfile: str | None = None
+    ssl_keyfile: str | None = None
+    ssl_password: str | None = None
+    ssl_check_hostname: bool = True
+
+    if security_protocol == "SASL_SSL":
+        config_dir = os.path.dirname(os.path.abspath(config_file))
+        ssl_cafile = _resolve_path(_get_optional(kafka_section, "SSL_CAFILE"), config_dir)
+        ssl_certfile = _resolve_path(_get_optional(kafka_section, "SSL_CERTFILE"), config_dir)
+        ssl_keyfile = _resolve_path(_get_optional(kafka_section, "SSL_KEYFILE"), config_dir)
+        ssl_password = _get_optional(kafka_section, "SSL_PASSWORD")
+        ssl_check_hostname = _parse_bool(
+            _get_optional(kafka_section, "SSL_CHECK_HOSTNAME"), "SSL_CHECK_HOSTNAME", default=True
+        )
+
+        ssl_sanity_checks(ssl_cafile, ssl_certfile, ssl_keyfile, ssl_password)
+    else:
+        ignored_keys = [key for key in SSL_KEYS if _get_optional(kafka_section, key) is not None]
+        if ignored_keys:
+            logging.warning(
+                f"Ignoring {', '.join(ignored_keys)} in section [KAFKA]: SECURITY_PROTOCOL is {security_protocol}, not SASL_SSL"
+            )
 
     return ScannerConfig(
         interface=interface,
@@ -121,6 +205,11 @@ def parse_config(config_file: str) -> ScannerConfig:
             sasl_mechanism=sasl_mechanism,
             sasl_plain_username=sasl_plain_username,
             sasl_plain_password=sasl_plain_password,
+            ssl_cafile=ssl_cafile,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+            ssl_password=ssl_password,
+            ssl_check_hostname=ssl_check_hostname,
         )
     )
 
