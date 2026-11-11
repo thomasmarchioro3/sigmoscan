@@ -1,0 +1,13 @@
+services:
+  kafka-sasl-ssl:
+    build: .
+    image: kafka-sasl-ssl:local
+    container_name: kafka-sasl-ssl
+    ports:
+      - "9092:9092"
+    healthcheck:
+      # Uses the plaintext listener that only exists inside the container
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list > /dev/null"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
