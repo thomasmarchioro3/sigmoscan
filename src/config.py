@@ -1,1 +1,1 @@
-from ._config import parse_config
+from ._config import mask_secrets, parse_config

@@ -24,6 +24,9 @@ SUPPORTED_SECURITY_PROTOCOLS: tuple[str, ...] = ("PLAINTEXT", "SASL_PLAINTEXT", 
 # Keys of the [KAFKA] section that are only used with SASL_SSL
 SSL_KEYS: tuple[str, ...] = ("SSL_CAFILE", "SSL_CERTFILE", "SSL_KEYFILE", "SSL_PASSWORD", "SSL_CHECK_HOSTNAME")
 
+# Shown instead of a password when the config is logged
+SECRET_MASK: str = "***"
+
 
 def _get_optional(section: configparser.SectionProxy, key: str) -> str | None:
     """
@@ -212,4 +215,23 @@ def parse_config(config_file: str) -> ScannerConfig:
             ssl_check_hostname=ssl_check_hostname,
         )
     )
+
+
+def mask_secrets(config: ScannerConfig) -> ScannerConfig:
+    """
+    Returns a copy of `config` where the passwords that are set are replaced by
+    SECRET_MASK, so the config can be logged. Passwords that are not set stay
+    None, so the log still shows whether they are configured.
+    """
+
+    def _mask(value: str | None) -> str | None:
+        return None if value is None else SECRET_MASK
+
+    kafka_config = config["kafka_config"].copy()
+    kafka_config["sasl_plain_password"] = _mask(kafka_config["sasl_plain_password"])
+    kafka_config["ssl_password"] = _mask(kafka_config["ssl_password"])
+
+    masked = config.copy()
+    masked["kafka_config"] = kafka_config
+    return masked
 

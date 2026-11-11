@@ -19,7 +19,7 @@ import pandas as pd
 
 from src.capture import capture_live_interface
 from src.color import color
-from src.config import parse_config
+from src.config import mask_secrets, parse_config
 from src.flow import get_df_from_pcap
 from src.kafka import ScannerKafkaProducer
 from src.logo import ASCII_ART
@@ -64,7 +64,7 @@ def main():
     config = parse_config(configfile)
 
     print(ASCII_ART)
-    logging.info(f"Config: {config}")
+    logging.info(f"Config: {mask_secrets(config)}")
 
     temp_dir = config["temp_pcap_path"]
     rotate_every_t_seconds = config["rotate_every_t_sec"]
